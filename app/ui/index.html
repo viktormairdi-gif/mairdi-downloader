@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>MAIRDI Загрузчик</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/style.css">
+<script>window.TOKEN = "__TOKEN__";</script>
+</head>
+<body>
+<div id="app">
+  <header class="toolbar">
+    <div class="brand"><img src="/icon.png" alt=""><span>Загрузчик</span></div>
+    <button class="tb primary" data-cmd="add" title="Добавить закачку (Ctrl+N или вставьте ссылку Ctrl+V)"><i>＋</i><span>Добавить</span></button>
+    <div class="sep"></div>
+    <button class="tb" data-cmd="resume" title="Запустить выбранные"><i>▶</i><span>Старт</span></button>
+    <button class="tb" data-cmd="pause" title="Приостановить выбранные"><i>❚❚</i><span>Пауза</span></button>
+    <button class="tb" data-cmd="remove" title="Удалить выбранные из списка (Del)"><i>✕</i><span>Удалить</span></button>
+    <div class="sep"></div>
+    <button class="tb" data-cmd="resumeAll" title="Запустить все"><i>▶▶</i><span>Старт всех</span></button>
+    <button class="tb" data-cmd="pauseAll" title="Приостановить все"><i>❚❚❚</i><span>Пауза всех</span></button>
+    <div class="sep"></div>
+    <button class="tb" data-cmd="openRoot" title="Открыть папку загрузок"><i>📂</i><span>Папка</span></button>
+    <button class="tb" data-cmd="sortRoot" title="Разложить по папкам всё, что лежит в корне папки загрузок"><i>🗂</i><span>Разобрать</span></button>
+    <button class="tb" data-cmd="settings" title="Настройки"><i>⚙</i><span>Настройки</span></button>
+    <div class="grow"></div>
+    <div class="speedmode" title="Ограничение скорости">
+      <span class="lbl">Скорость</span>
+      <button data-speed="max">Макс</button><button data-speed="mid">Средняя</button><button data-speed="low">Мин</button>
+    </div>
+    <label class="shutdown" title="Выключить компьютер, когда все закачки завершатся"><input type="checkbox" id="shutdown"> ⏻</label>
+  </header>
+
+  <div class="main">
+    <aside class="tree" id="tree"></aside>
+    <section class="center" id="jobsView">
+      <div class="filterbar">
+        <input id="search" type="search" placeholder="Поиск по имени, сайту, папке…">
+        <span id="viewTitle"></span>
+        <button class="link" id="openCat" hidden>Открыть папку ↗</button>
+      </div>
+      <div class="tablewrap" id="tablewrap">
+        <table class="grid">
+          <thead><tr>
+            <th data-sort="name" class="c-name">Имя файла</th>
+            <th data-sort="total" class="c-size">Размер</th>
+            <th data-sort="progress" class="c-prog">Загружено</th>
+            <th data-sort="speed" class="c-speed">Скорость</th>
+            <th data-sort="eta" class="c-eta">Осталось</th>
+            <th data-sort="connections" class="c-conn" title="Потоков / пиров">Потоки</th>
+            <th data-sort="dir" class="c-dir">Папка</th>
+            <th data-sort="added" class="c-added">Добавлен</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden>
+          <div class="big">⬇</div>
+          <div>Перетащите сюда ссылку или .torrent, нажмите <b>Добавить</b> или вставьте ссылку <b>Ctrl+V</b>.</div>
+          <div class="muted">Файлы сами разложатся по папкам: прайсы, документы, дистрибутивы, программирование, видео…</div>
+        </div>
+      </div>
+      <div class="details" id="details">
+        <div class="tabs"><button class="on" data-tab="info">Информация</button><button data-tab="map">Карта секций</button></div>
+        <div class="tabbody" id="tab-info"></div>
+        <div class="tabbody" id="tab-map" hidden><canvas id="map" height="64"></canvas><div class="muted" id="mapNote"></div></div>
+      </div>
+    </section>
+
+    <!-- Google Диск -->
+    <section class="center drive" id="drive" hidden>
+      <div class="filterbar">
+        <div class="crumbs" id="gCrumbs"></div>
+        <div class="grow"></div>
+        <input id="gSearch" type="search" placeholder="Поиск на Диске…">
+      </div>
+      <div class="gtools">
+        <div class="gsections" id="gSections">
+          <button data-sec="my">Мой диск</button><button data-sec="shared">Доступные мне</button><button data-sec="drives">Общие диски</button>
+          <button data-sec="recent">Недавние</button><button data-sec="starred">Помеченные</button><button data-sec="trash">Корзина</button>
+        </div>
+        <div class="grow"></div>
+        <div class="gquota" id="gQuota" hidden><span></span><div class="qbar"><div></div></div></div>
+        <button class="gbtn" id="gLink" title="Скачать файл, видео или торрент по ссылке прямо в эту папку Диска (Ctrl+V)">🔗 По ссылке</button>
+        <button class="gbtn" id="gUpFiles" title="Загрузить файлы с компьютера в эту папку (или перетащите их в окно)">⇪ Файлы</button>
+        <button class="gbtn" id="gUpDir" title="Загрузить папку с компьютера целиком">⇪ Папку</button>
+        <button class="gbtn" id="gUp" title="На уровень выше (Backspace)">⬆</button>
+        <button class="gbtn" id="gReload" title="Обновить (F5)">↻</button>
+        <button class="gbtn primary" id="gDown" title="Скачать выбранное на компьютер (Enter)">⬇ Скачать</button>
+      </div>
+      <div class="gacts" id="gActs">
+        <button class="gbtn" id="gNew" title="Новая папка здесь (Ctrl+Shift+N)">＋ Папка</button>
+        <span class="gsep"></span>
+        <button class="gbtn" id="gRen" title="Переименовать (F2)">✎ Переименовать</button>
+        <button class="gbtn" id="gMove" title="Переместить в другую папку — ссылки на файлы не меняются (или перетащите на папку)">➜ Переместить</button>
+        <button class="gbtn" id="gShare" title="Кто видит файл и доступ по ссылке">👥 Доступ</button>
+        <button class="gbtn" id="gStar" title="Пометить звёздочкой / снять">☆ Пометить</button>
+        <button class="gbtn danger" id="gTrash" title="В корзину Диска (Delete). Вернуть — Ctrl+Z или из «Корзины»">🗑 В корзину</button>
+        <button class="gbtn" id="gRestore" title="Вернуть из корзины на место">↩ Восстановить</button>
+        <button class="gbtn danger" id="gDelForever" title="Удалить навсегда — вернуть будет нельзя">✖ Удалить навсегда</button>
+        <span class="grow"></span>
+        <span class="muted" id="gSelInfo"></span>
+        <button class="gbtn danger" id="gEmptyTrash" title="Удалить всё из корзины навсегда">Очистить корзину</button>
+      </div>
+      <div class="gpending" id="gPending" hidden>
+        <span id="gPendingText"></span><span class="grow"></span>
+        <button class="gbtn primary" id="gPendingGo">⇪ Загрузить сюда</button><button class="gbtn" id="gPendingNo">Отмена</button>
+      </div>
+      <div class="tablewrap" id="gWrap">
+        <table class="grid gtable">
+          <thead><tr><th class="c-name" data-gsort="name">Имя</th><th class="c-owner" data-gsort="owner">Владелец</th><th class="c-mod" data-gsort="modified">Изменён</th><th class="c-size" data-gsort="size">Размер</th></tr></thead>
+          <tbody id="gRows"></tbody>
+        </table>
+        <div class="empty" id="gEmpty" hidden></div>
+      </div>
+      <div class="details gdetails"><div class="gprev" id="gPrev"></div><div class="tabbody" id="gInfo"></div></div>
+    </section>
+  </div>
+
+  <footer class="status">
+    <span id="stDown">↓ 0</span>
+    <span id="stUp">↑ 0</span>
+    <span id="stActive"></span>
+    <span class="grow"></span>
+    <span id="stTools"></span>
+    <span id="stExt" class="link" title="Расширение для браузера"></span>
+    <span id="stRoot" class="link"></span>
+  </footer>
+</div>
+
+<div id="drop" hidden><div>Отпустите — добавлю закачку</div></div>
+<div id="menu" class="menu" hidden></div>
+<div id="toasts"></div>
+
+<!-- Добавить -->
+<dialog id="dlgAdd">
+  <form method="dialog">
+    <h2>Новая закачка</h2>
+    <label>Ссылки — каждая с новой строки
+      <textarea id="addUrls" rows="5" placeholder="https://…  magnet:?…  YouTube, Instagram, TikTok, VK…  Google Диск, Яндекс.Диск, Dropbox, OneDrive…"></textarea>
+    </label>
+    <div class="row">
+      <label>Что качать
+        <select id="addMode"><option value="auto">Определить автоматически</option><option value="video">Видео со страницы</option><option value="file">Файл по прямой ссылке</option></select>
+      </label>
+      <label>Качество видео
+        <select id="addQuality">
+          <option value="best">Лучшее</option><option value="2160">до 4K</option><option value="1080">до 1080p</option>
+          <option value="720">до 720p</option><option value="480">до 480p</option><option value="audio">Только звук (MP3)</option>
+        </select>
+      </label>
+    </div>
+    <label>Куда положить
+      <select id="addDir"></select>
+    </label>
+    <div class="checks">
+      <label><input type="checkbox" id="addPlaylist"> Весь плейлист</label>
+      <label><input type="checkbox" id="addPaused"> Добавить на паузе</label>
+      <label><input type="checkbox" id="addForce"> Скачать, даже если уже скачано</label>
+    </div>
+    <div class="todrive" id="addDriveBox" hidden>
+      <label class="lead"><input type="checkbox" id="addToDrive"> ☁ Сразу на Google Диск</label>
+      <div class="sub">
+        <span class="muted" id="addDriveWhere"></span>
+        <label><input type="checkbox" id="addKeep"> оставить копию на компьютере</label>
+      </div>
+    </div>
+    <label class="file">или торрент-файл <input type="file" id="addTorrent" accept=".torrent" multiple></label>
+    <div class="buttons"><button value="cancel" class="ghost">Отмена</button><button id="addGo" value="ok" class="primary">Скачать</button></div>
+  </form>
+</dialog>
+
+<!-- Переместить -->
+<dialog id="dlgMove">
+  <form method="dialog">
+    <h2>Переложить в папку</h2>
+    <label>Папка
+      <select id="moveDir"></select>
+    </label>
+    <label>или новая подпапка (например <code>Прайсы\Asia Mobile</code>)
+      <input id="moveNew" type="text">
+    </label>
+    <div class="checks" id="moveRemember"></div>
+    <div class="buttons"><button value="cancel" class="ghost">Отмена</button><button id="moveGo" value="ok" class="primary">Переложить</button></div>
+  </form>
+</dialog>
+
+<!-- Настройки -->
+<dialog id="dlgSettings" class="wide">
+  <form method="dialog">
+    <h2>Настройки</h2>
+    <fieldset><legend>Папка загрузок</legend>
+      <div class="row tight"><input id="sRoot" type="text"><button type="button" id="sPick">Обзор…</button><button type="button" id="sGDrive" hidden>Google Диск</button></div>
+      <div class="muted">Внутри неё программа сама создаст папки: Прайсы, Документы, Дистрибутивы, Программирование, Видео, Музыка, Изображения, Книги, Архивы, Торренты, Прочее. Если выбрать папку Google Диска, файлы сразу уйдут в облако.</div>
+    </fieldset>
+    <fieldset><legend>Скорость</legend>
+      <div class="row">
+        <label>Потоков на файл <input id="sConn" type="number" min="1" max="16"></label>
+        <label>Одновременных закачек <input id="sMax" type="number" min="1" max="20"></label>
+        <label>«Средняя», КБ/с <input id="sMid" type="number" min="1"></label>
+        <label>«Мин», КБ/с <input id="sLow" type="number" min="1"></label>
+      </div>
+      <div class="row">
+        <label>Отдача торрентов, КБ/с (0 — без ограничения) <input id="sUp" type="number" min="0"></label>
+        <label>Раздавать до рейтинга <input id="sRatio" type="number" min="0" step="0.1"></label>
+        <label>Качество видео <select id="sQuality">
+          <option value="best">Лучшее</option><option value="2160">до 4K</option><option value="1080">до 1080p</option>
+          <option value="720">до 720p</option><option value="480">до 480p</option><option value="audio">Только звук</option></select></label>
+      </div>
+    </fieldset>
+    <fieldset><legend>Работа</legend>
+      <div class="checks col">
+        <label><input type="checkbox" id="sIntercept"> Перехватывать загрузки из браузера (нужно расширение)</label>
+        <label><input type="checkbox" id="sClip"> Следить за буфером обмена — скопировали ссылку на файл, программа предложит скачать</label>
+        <label><input type="checkbox" id="sAutoSort"> Раскладывать по папкам и то, что браузер сохранил мимо программы</label>
+        <label><input type="checkbox" id="sDupes"> Не скачивать повторно то, что уже есть</label>
+        <label><input type="checkbox" id="sTrackers"> Добавлять в торренты лучшие публичные трекеры (больше пиров — выше скорость)</label>
+        <label><input type="checkbox" id="sAutostart"> Запускать вместе с Windows</label>
+      </div>
+      <label>Не перехватывать загрузки с сайтов (по одному в строке)
+        <textarea id="sExcluded" rows="2"></textarea>
+      </label>
+    </fieldset>
+    <fieldset id="sDriveSet"><legend>Google Диск — «Скачать в Диск»</legend>
+      <div class="row">
+        <label>Аккаунт <select id="sDriveAcc"></select></label>
+        <label>Папка на Диске <input id="sDriveFolder" type="text" placeholder="Загрузки"></label>
+      </div>
+      <div class="checks col">
+        <label><input type="checkbox" id="sDriveKeep"> Оставлять копию на компьютере (иначе файл удаляется, как только Google подтвердит, что принял его целиком)</label>
+      </div>
+      <div class="muted">Внутри папки — та же раскладка, что на компьютере: Загрузки\Прайсы, Загрузки\Видео\YouTube… «В Диск» — в окне «Новая закачка», в меню расширения Chrome и кнопкой «🔗 По ссылке» в открытой папке Диска.</div>
+    </fieldset>
+    <fieldset><legend>Основная программа</legend>
+      <div class="row tight">
+        <button type="button" id="sDefault">Открывать торренты и magnet-ссылки этой программой</button>
+        <button type="button" id="sRules">Правила раскладки…</button>
+        <button type="button" id="sExt">🧩 Расширение для браузера…</button>
+      </div>
+      <div class="row tight">
+        <button type="button" id="sSendTo">Добавить в Проводник «Отправить → Google Диск»</button>
+      </div>
+    </fieldset>
+    <div class="buttons"><span class="muted grow" id="sVersion"></span><button value="cancel" class="ghost">Отмена</button><button id="sSave" value="ok" class="primary">Сохранить</button></div>
+  </form>
+</dialog>
+
+<!-- Правила -->
+<dialog id="dlgRules" class="wide">
+  <form method="dialog">
+    <h2>Правила раскладки</h2>
+    <div class="muted">Программа учится: когда вы перекладываете файл и отмечаете «запомнить», появляется правило. Правила важнее встроенной логики.</div>
+    <table class="rules"><thead><tr><th>Когда</th><th>Значение</th><th>Папка</th><th></th></tr></thead><tbody id="rulesBody"></tbody></table>
+    <div class="row tight">
+      <select id="rKind"><option value="domain">Сайт</option><option value="ext">Расширение</option><option value="keyword">Слово в названии</option></select>
+      <input id="rValue" placeholder="asiamobile.kg  /  .xlsx  /  прайс">
+      <select id="rDir"></select>
+      <button type="button" id="rAdd">Добавить</button>
+    </div>
+    <div class="buttons"><button value="ok" class="primary">Готово</button></div>
+  </form>
+</dialog>
+
+<!-- Расширение: мастер установки -->
+<dialog id="dlgExt" class="extwiz">
+  <form method="dialog">
+    <h2>Расширение для браузера</h2>
+    <div id="extState" class="extstate"></div>
+    <div class="extbr" id="extBr">
+      <span class="muted">Браузер:</span>
+      <button type="button" data-br="chrome" class="on">Chrome</button>
+      <button type="button" data-br="edge">Edge</button>
+    </div>
+
+    <ol class="wiz" id="extSteps">
+      <li><b>Откройте страницу расширений</b>
+        <div class="act"><button type="button" class="primary" id="extGo">Открыть <span class="brPage">chrome://extensions</span></button></div>
+        <div class="sub">Откроется новая вкладка. Путь к папке расширения скопируется сам — он понадобится в шаге 3.
+          Не открылась — наберите адрес <code class="brPage">chrome://extensions</code> вручную.</div>
+      </li>
+      <li><b>Включите «Режим разработчика»</b>
+        <div class="sub"><span class="brOnly" data-br="chrome">Переключатель в правом верхнем углу страницы.</span><span class="brOnly" data-br="edge" hidden>Переключатель в левой панели внизу.</span></div>
+      </li>
+      <li><b>Нажмите «Загрузить распакованное расширение»</b>
+        <div class="sub">Откроется окно выбора папки: щёлкните в строку адреса вверху, нажмите <kbd>Ctrl</kbd>+<kbd>V</kbd>, затем <kbd>Enter</kbd> и «Выбор папки».</div>
+        <div class="pathrow"><code id="extPath"></code><button type="button" id="extCopy">📋 Копировать</button></div>
+      </li>
+      <li><b>Закрепите значок</b>
+        <div class="sub">Значок 🧩 справа от адресной строки → 📌 рядом с «MAIRDI Загрузчик». В нём — перехват загрузок и «Скачать видео».</div>
+      </li>
+    </ol>
+
+    <ol class="wiz" id="extUpd" hidden>
+      <li><b>Откройте страницу расширений</b>
+        <div class="act"><button type="button" class="primary" id="extGo2">Открыть <span class="brPage">chrome://extensions</span></button></div>
+      </li>
+      <li><b>Нажмите ⟳ в карточке «MAIRDI Загрузчик»</b>
+        <div class="sub">Браузер перечитает файлы новой версии из той же папки — ничего переустанавливать не нужно.</div>
+      </li>
+    </ol>
+
+    <div class="sub muted" id="extNote">Браузер может напоминать «Отключите расширения в режиме разработчика» — это нормально, нажмите крестик. Программа сама увидит, что расширение подключилось.</div>
+    <div class="buttons">
+      <button type="button" id="extOpen">Открыть папку расширения</button>
+      <button type="button" class="link" id="extAgain" hidden>Показать инструкцию</button>
+      <span class="grow"></span>
+      <button value="ok" class="primary" id="extDone">Готово</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Google Диск: имя (новая папка / переименование) -->
+<dialog id="dlgGName">
+  <form method="dialog">
+    <h2 id="gNameTitle">Новая папка</h2>
+    <input id="gNameInput" autocomplete="off" spellcheck="false">
+    <div class="sub muted" id="gNameHint"></div>
+    <div class="buttons"><button value="cancel" formnovalidate>Отмена</button><button value="ok" class="primary" id="gNameGo">Создать</button></div>
+  </form>
+</dialog>
+
+<!-- Google Диск: куда переместить -->
+<dialog id="dlgGMove" class="wide">
+  <form method="dialog">
+    <h2 id="gMoveTitle">Переместить</h2>
+    <div class="gpick-top">
+      <div class="gsections" id="gPickSec"><button type="button" data-sec="my" class="on">Мой диск</button><button type="button" data-sec="drives">Общие диски</button></div>
+      <div class="crumbs" id="gPickCrumbs"></div>
+    </div>
+    <div class="gpick" id="gPickList"></div>
+    <div class="sub muted">Ссылки на файлы при перемещении не меняются — у кого была ссылка, тот откроет файл как раньше. Двойной щелчок — войти в папку.</div>
+    <div class="buttons">
+      <button type="button" id="gPickNew">＋ Новая папка</button>
+      <span class="grow"></span>
+      <button value="cancel" formnovalidate>Отмена</button>
+      <button type="button" id="gPickCopy" title="Оставить на месте и положить копию сюда">Копировать сюда</button>
+      <button type="button" class="primary" id="gPickGo">Переместить сюда</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Google Диск: доступ -->
+<dialog id="dlgGShare">
+  <form method="dialog">
+    <h2>Доступ: <span id="gShareName"></span></h2>
+    <fieldset><legend>По ссылке</legend>
+      <div class="row tight gshare-link">
+        <select id="gLinkRole">
+          <option value="">Закрыт — только добавленные люди</option>
+          <option value="reader">Все, у кого есть ссылка: читатель</option>
+          <option value="commenter">Все, у кого есть ссылка: комментатор</option>
+          <option value="writer">Все, у кого есть ссылка: редактор</option>
+        </select>
+        <button type="button" id="gLinkCopy">📋 Копировать ссылку</button>
+      </div>
+      <div class="sub muted" id="gLinkWarn"></div>
+    </fieldset>
+    <fieldset><legend>Люди</legend>
+      <div id="gPeople" class="gpeople"></div>
+      <div class="row tight gshare-add">
+        <input id="gAddEmail" placeholder="почта@example.com" autocomplete="off" spellcheck="false">
+        <select id="gAddRole"><option value="reader">Читатель</option><option value="commenter">Комментатор</option><option value="writer">Редактор</option></select>
+        <button type="button" id="gAddGo">Добавить</button>
+      </div>
+      <label class="inline"><input type="checkbox" id="gAddNotify"> Отправить человеку письмо от Google</label>
+    </fieldset>
+    <div class="buttons"><button value="ok" class="primary">Готово</button></div>
+  </form>
+</dialog>
+
+<!-- Ключ приложения Google -->
+<dialog id="dlgGKey" class="wide">
+  <form method="dialog">
+    <h2>Подключение Google Диска</h2>
+    <div class="muted">Один раз создайте свой ключ приложения в Google Cloud — это бесплатно и занимает около пяти минут. Пароль от Google программа не видит: вход идёт в вашем браузере.</div>
+    <ol class="steps">
+      <li><b>Проект.</b> <button type="button" class="link" data-gurl="https://console.cloud.google.com/projectcreate">Создать проект ↗</button> — название любое, например «MAIRDI Загрузчик».</li>
+      <li><b>Drive API.</b> <button type="button" class="link" data-gurl="https://console.cloud.google.com/apis/library/drive.googleapis.com">Открыть ↗</button> и нажмите «Включить» (Enable).</li>
+      <li><b>Экран входа.</b> <button type="button" class="link" data-gurl="https://console.cloud.google.com/auth/overview">Открыть ↗</button> → «Начать»: имя приложения, ваша почта, аудитория <b>«Внешние» (External)</b>, создать.
+        Затем на вкладке «Аудитория» (Audience) нажмите <b>«Опубликовать приложение»</b> (In production) — иначе Google будет отключать вход каждые 7 дней.</li>
+      <li><b>Ключ.</b> <button type="button" class="link" data-gurl="https://console.cloud.google.com/auth/clients">Открыть ↗</button> → «Создать клиента» → тип <b>«Приложение для компьютера» (Desktop app)</b> → «Создать» → <b>«Скачать JSON»</b>.</li>
+      <li>Выберите скачанный файл ниже — или вставьте его содержимое, или Client ID и Client Secret.</li>
+    </ol>
+    <label class="file">Файл ключа (client_secret_….json) <input type="file" id="gKeyFile" accept=".json,application/json"></label>
+    <label>Содержимое файла или Client ID
+      <textarea id="gKeyId" rows="3" placeholder='{"installed":{"client_id":"…apps.googleusercontent.com", …}}  или  1234-abc.apps.googleusercontent.com'></textarea>
+    </label>
+    <label>Client Secret (если выше вставлен только Client ID)
+      <input id="gKeySecret" type="text" placeholder="GOCSPX-…">
+    </label>
+    <div class="muted">При первом входе Google покажет «Приложение не проверено» — это ваше собственное приложение: нажмите «Дополнительно» → «Перейти на страницу…» → «Разрешить».</div>
+    <div class="buttons"><button value="cancel" class="ghost">Отмена</button><button id="gKeyGo" value="ok" class="primary">Сохранить и подключить</button></div>
+  </form>
+</dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>
